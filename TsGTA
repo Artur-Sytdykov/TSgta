@@ -1,0 +1,151 @@
+import pygame
+import random
+
+WIN_WIDTH = 800
+WIN_HEIGHT = 600
+FPS = 30
+# цвета    R    G    B
+BLACK   = (0,   0,   0)
+WHITE   = (255, 255, 255)
+RED     = (255, 0,   0)
+GREEN   = (0,   255, 0)
+BLUE    = (0,   0,   255)
+YELLOW  = (255, 255, 0)
+GRAY    = (200, 200, 200)
+BROWN   = (101, 67, 33)
+
+class Car(pygame.sprite.Sprite):
+   def __init__(self, x, y, img='Tractor288.png'):
+       super().__init__()
+       self.image = pygame.image.load(img).convert_alpha()
+       self.rect = self.image.get_rect()
+       self.rect.x = x
+       self.rect.y = y
+
+class Block(pygame.sprite.Sprite):
+    image_list = ['luja.png',
+                  'corowa.png',
+                  'yama.png',
+                  ]
+    def __init__(self, speed):
+        super().__init__()
+        img = Block.image_list[random.randint(0, 2)]
+        self.image = pygame.image.load(img).convert_alpha()
+        self.image = pygame.transform.rotate(self.image, 180)
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randrange(WIN_WIDTH)
+        self.rect.y = random.randrange(-200, WIN_HEIGHT - 200)
+        self.speed = speed
+
+    def update(self):
+        # Подвинуть блок "навстречу" автомобилю
+        self.rect.y += self.speed
+        if self.rect.y > WIN_HEIGHT:
+            self.__init__(self.speed)
+            self.rect.y = -50
+
+
+pygame.init()
+screen = pygame.display.set_mode([WIN_WIDTH, WIN_HEIGHT])
+clock = pygame.time.Clock()
+run = True
+start_image = pygame.image.load("TSgta.png").convert()
+base_font = pygame.font.SysFont('Arial', 36, True)
+
+# current_state - состояние игры:
+# 0: показываем стартовую картинку
+# 1: идет гонка
+# 2: пауза
+# 3: произошло столкновение
+current_state = 0
+
+# Создаем группы спрайтов:
+block_list = pygame.sprite.Group()
+all_sprites_list = pygame.sprite.Group()
+# Создаем блоки - препятствия и добавляем их в группы:
+for i in range(10):
+    block = Block(5)
+    block_list.add(block)
+    all_sprites_list.add(block)
+# Создаем спрайт игрока
+player = Car(WIN_WIDTH // 2, WIN_HEIGHT - 100)
+all_sprites_list.add(player)
+
+# Добавляем игрока в группу all_sprites_list:
+all_sprites_list.add(player)
+
+# Добавляем звук в игру
+background_sound = pygame.mixer.Sound("DRUM&BASE.mp3")
+crash_sound = pygame.mixer.Sound("crash.wav")
+# ---------- Запускаем главный игровой цикл -------
+while True:
+    # обработка событий мыши  клавиатуры:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            break
+        # обрабатываем нажатие на пробел
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                if current_state == 0:    #  начать игру
+                    current_state = 1
+                    background_sound.play()
+                elif current_state == 1:  # идет игра, нажали PAUSE
+                    current_state = 2
+                elif current_state == 2:  # сняли с паузы
+                    current_state = 1
+                    
+
+    # если идет игра
+    if current_state == 1:
+        # получаем информацию о положении мыши:
+        pos = pygame.mouse.get_pos()
+        # перемещаем спрайт игрока
+        player.rect.x = pos[0] - player.rect.width // 2
+        # перемещаем спрайты препятствий навстречу игроку:
+        block_list.update()
+        # если случилось столкновение, меняем текущее состояние на 3:
+        if pygame.sprite.spritecollideany(player, block_list):
+            current_state = 3
+            # про   игрываем звук столкновения:
+            crash_sound.play()
+
+
+    # начало прорисовки окна
+    screen.fill(BROWN)
+    # в зависимости от состояние игры current_state выполняем прорисовку экрана
+    # состояние 0: игра на стартовой экране
+    if current_state == 0:
+        screen.blit(start_image, (0,0))
+        text = base_font.render('PRESS SPACE TO START', True, RED)
+        text_rect = text.get_rect()
+        text_rect.centerx = WIN_WIDTH // 2
+        text_rect.y = WIN_HEIGHT * 0.1
+        screen.blit(text, text_rect)
+
+    # состояние 1: идет игра
+    elif current_state == 1:
+        all_sprites_list.draw(screen)
+
+    # состояние 2: игра на паузе
+    elif current_state == 2:
+        all_sprites_list.draw(screen)
+        text = base_font.render('PAUSE', True, RED)
+        text_rect = text.get_rect()
+        text_rect.centerx = WIN_WIDTH // 2
+        text_rect.y = WIN_HEIGHT * 0.4
+        screen.blit(text, text_rect)
+
+    # состояние 3: случилось столкновение
+    elif current_state == 3:
+        all_sprites_list.draw(screen)
+        text = base_font.render('YOU CRASHED!', True, RED)
+        text_rect = text.get_rect()
+        text_rect.centerx = WIN_WIDTH // 2
+        text_rect.y = WIN_HEIGHT * 0.4
+        screen.blit(text, text_rect)
+
+
+    pygame.display.update()
+    # конец прорисовки окна
+    clock.tick(FPS)
